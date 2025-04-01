@@ -17,11 +17,11 @@ Each match record includes:
 - Home team and away team
 - Final score (home and away goals)
 
-T## Constructing Alpha and Delta Parameters
+### Constructing Alpha and Delta Parameters
 
 To model goals scored in Premier League matches, we fit a Poisson regression model where each team’s scoring rate depends on its **attack strength** and the opponent’s **defense weakness**.
 
-### Model Structure
+#### Model Structure
 
 For a given match between team $\( i \)$ (e.g., Arsenal) and opponent $\( j \)$ (e.g., Chelsea):
 
@@ -47,7 +47,7 @@ We model home and away goals separately, producing **two goal observations per m
 ( \text{Goals}_{\text{away}} \sim \text{Poisson}(\exp(\alpha_{\text{away}} - \delta_{\text{home}})) )
 ```
 
-### Estimation via Maximum Likelihood
+#### Estimation via Maximum Likelihood
 
 We use **maximum likelihood estimation (MLE)** to solve for all team-specific $\( \alpha \)$ and $\( \delta \)$ parameters that best explain observed goals from real matches (e.g., 2023–24 and 2024–25 seasons).
 
@@ -60,7 +60,7 @@ We use **maximum likelihood estimation (MLE)** to solve for all team-specific $\
  ```
    where $\( y_m \)$ is the observed goal count for match $\( m \)$.
 
-### Normalization
+#### Normalization
 
 Because the model is overparameterized (you can add a constant to all \( \alpha \)'s and subtract from all \( \delta \)'s without changing predictions), we impose a constraint:
 
