@@ -8,78 +8,90 @@ The English Premier League allocates hundreds of millions of pounds annually bas
 
 At the heart of the simulation is a **probabilistic match outcome engine** built on team-specific attack and defense strengths. Match results are generated stochastically across full seasons, with outcomes translated into revenue via **placement-based prize mapping**.
 
-## Data Sources and Preparation
+## Data Processing & Statistical Modeling
 
-We use match-level data from the **2023–24 and 2024–25 English Premier League seasons** to estimate team-specific scoring tendencies.
+This project estimates team-specific attacking and defensive abilities in the English Premier League using historical match outcomes. We model the number of goals each team scores using a Poisson log-linear model, with parameters estimated via maximum likelihood.
 
-Each match record includes:
-- Match date
-- Home team and away team
-- Final score (home and away goals)
+### Data Sources
 
-### Constructing Alpha and Delta Parameters
+We use match-level data from the 2021-22, 2022-23 and 2023–24 EPL seasons. Each record includes:
 
-To model goals scored in Premier League matches, we fit a Poisson regression model where each team’s scoring rate depends on its **attack strength** and the opponent’s **defense weakness**.
+- Home and away team names  
+- Match date  
+- Final score (home goals, away goals)
 
-#### Model Structure
+The data is preprocessed into a long format, with one row per team per match (i.e., each match yields two observations — one for home team goals, one for away).
 
-For a given match between team $\( i \)$ (e.g., Arsenal) and opponent $\( j \)$ (e.g., Chelsea):
+```r
+data2023.24 <- read.csv('https://www.football-data.co.uk/mmz4281/2324/E0.csv')
+data2022.23 <- read.csv('https://www.football-data.co.uk/mmz4281/2223/E0.csv')
+```
+
+
+
+### Statistical Model
+
+We assume that the number of goals team *i* scores against team *j* follows a Poisson distribution:
 
 ```math
-\text{Goals}_{ij} \sim \text{Poisson}(\lambda_{ij}), \quad \lambda_{ij} = \exp(\alpha_i - \delta_j)
+y_{ij} \sim \text{Poisson}(\lambda_{ij}), \quad \lambda_{ij} = \exp(\alpha_i - \delta_j)
 ```
 
 Where:
-- $\( \alpha_i \)$ is the **attack strength** of team $\( i \)$
-- $\( \delta_j \)$ is the **defense weakness** of team $\( j \)$
-- $\( \lambda_{ij} \)$ is the expected number of goals scored by team $\( i \)$
 
-We model home and away goals separately, producing **two goal observations per match**:
-- One for home goals:
+- $\alpha_i$: Latent attack strength of team *i*  
+- $\delta_j$: Latent defense weakness of team *j*  
+- $\lambda_{ij}$: Expected goals scored by team *i* vs. *j*
+
+Each match contributes two observations:
+
+- Home team goals: $\lambda_{\text{home}} = \exp(\alpha_{\text{home}} - \delta_{\text{away}})$  
+- Away team goals: $\lambda_{\text{away}} = \exp(\alpha_{\text{away}} - \delta_{\text{home}})$
+
+
+### Parameter Estimation
+
+We estimate the parameters $\alpha$ and $\delta$ via maximum likelihood, maximizing the log-likelihood function:
 
 ```math
-( \text{Goals}_{\text{home}} \sim \text{Poisson}(\exp(\alpha_{\text{home}} - \delta_{\text{away}})) )
+\mathcal{L} = \sum_{m=1}^M \left[ y_m \log(\lambda_m) - \lambda_m - \log(y_m!) \right]
 ```
 
-- One for away goals:
+Where:
 
-```math
-( \text{Goals}_{\text{away}} \sim \text{Poisson}(\exp(\alpha_{\text{away}} - \delta_{\text{home}})) )
+- $y_m$: Observed goal count  
+- $\lambda_m = \exp(\alpha_i - \delta_j)$: Modeled rate  
+- $M$: Total number of team-match observations
+
+The negative log-likelihood is minimized using `scipy.optimize.minimize` (e.g., L-BFGS-B).
+
+```r
+out<-optim(theta0,likelihood.function,control= list(fnscale=-1), method="BFGS"  )
 ```
 
-#### Estimation via Maximum Likelihood
 
-We use **maximum likelihood estimation (MLE)** to solve for all team-specific $\( \alpha \)$ and $\( \delta \)$ parameters that best explain observed goals from real matches (e.g., 2023–24 and 2024–25 seasons).
 
-1. Each match provides two observations (home team and away team goals).
-2. Team identities are encoded as dummy variables or categorical indices.
-3. We solve for $\( \alpha_i \)$ and $\( \delta_j \)$ by maximizing the joint log-likelihood:
+### Identifiability and Normalization
 
- ```math
- {L} = \sum_{m} \left[ y_m \log(\lambda_m) - \lambda_m - \log(y_m!) \right]
- ```
-   where $\( y_m \)$ is the observed goal count for match $\( m \)$.
+The model is overparameterized: adding a constant to all $\alpha$ values and subtracting it from all $\delta$ values leaves predictions unchanged. To ensure identifiability, we impose the constraint:
 
-#### Normalization
-
-Because the model is overparameterized (you can add a constant to all \( \alpha \)'s and subtract from all \( \delta \)'s without changing predictions), we impose a constraint:
-
-```math
+$$
 \sum_i \alpha_i = 0
-\quad \text{or} \quad \sum_j \delta_j = 0
+$$
+
+This centers team attack strengths relative to a league-average baseline.
+
+```r
+alphaOut[20] <-  -1*sum( alphaOut[1:19] ) #sum to zero constraint
+deltaOut[20] <-  -1* sum( deltaOut[1:19] )
 ```
 
-This makes the parameters interpretable relative to a league-average baseline:
-- Positive $\( \alpha_i \):$ team scores **more than average**
-- Negative $\( \delta_j \):$ team concedes **fewer than average**
+**Interpretation**
 
+- $\alpha_i > 0$: Team *i* scores more than average (strong offense)  
+- $\delta_j < 0$: Team *j* concedes fewer goals than average (strong defense)
 
-**Summary:**
-- **Alpha (α)** measures how much a team contributes to scoring goals.
-- **Delta (δ)** measures how much a team contributes to conceding goals.
-- Both are estimated from historical goal data using a log-linear Poisson model and maximum likelihood.
-
-This method captures latent team quality and relative performance based on actual matches. Using two full seasons improves estimation stability and reduces noise from short-term anomalies.
+These parameters provide a quantitative summary of team quality, inferred from observed match outcomes.
 
 ## Revenue Mapping by League Position
 
