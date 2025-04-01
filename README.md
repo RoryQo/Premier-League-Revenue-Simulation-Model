@@ -300,7 +300,7 @@ Where $\( R \)$ represents simulated total revenue over a season.
 
 ### Output:
 
-- Change in expected revenue under each intervention
+- Average the thousand revenue changes for each team
 
 <div align="center">
   <img src="https://github.com/RoryQo/premier-league-revenue-simulation-model/blob/main/Figures/scatter.png?raw=true" width="500px">
