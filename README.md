@@ -17,23 +17,68 @@ Each match record includes:
 - Home team and away team
 - Final score (home and away goals)
 
-These data are used to fit **Poisson goal models** that estimate:
-- **Attack strength (alpha)**: how often a team scores
-- **Defense strength (beta)**: how often a team concedes
+T## Constructing Alpha and Delta Parameters
 
-### Processing Workflow:
-1. Standardize team names and match structures
-2. Generate home/away goal records
-3. Fit a Poisson regression model for goals scored as:
-   ```math
-   \text{Goals}_{ij} \sim \text{Poisson}(\lambda_{ij}), \quad \lambda_{ij} = \exp(\alpha_i - \beta_j)
-   ```
-4. Estimate all team-specific parameters via maximum likelihood
+To model goals scored in Premier League matches, we fit a Poisson regression model where each team’s scoring rate depends on its **attack strength** and the opponent’s **defense weakness**.
 
-**Output**:  
-Each team receives an `alpha` and `beta` used in simulation.
+### Model Structure
 
-**Interpretation**:  
+For a given match between team $\( i \)$ (e.g., Arsenal) and opponent $\( j \)$ (e.g., Chelsea):
+
+```math
+\text{Goals}_{ij} \sim \text{Poisson}(\lambda_{ij}), \quad \lambda_{ij} = \exp(\alpha_i - \delta_j)
+```
+
+Where:
+- $\( \alpha_i \)$ is the **attack strength** of team $\( i \)$
+- $\( \delta_j \)$ is the **defense weakness** of team $\( j \)$
+- $\( \lambda_{ij} \)$ is the expected number of goals scored by team $\( i \)$
+
+We model home and away goals separately, producing **two goal observations per match**:
+- One for home goals:
+
+```math
+( \text{Goals}_{\text{home}} \sim \text{Poisson}(\exp(\alpha_{\text{home}} - \delta_{\text{away}})) )
+```
+
+- One for away goals:
+
+```math
+( \text{Goals}_{\text{away}} \sim \text{Poisson}(\exp(\alpha_{\text{away}} - \delta_{\text{home}})) )
+```
+
+### Estimation via Maximum Likelihood
+
+We use **maximum likelihood estimation (MLE)** to solve for all team-specific $\( \alpha \)$ and $\( \delta \)$ parameters that best explain observed goals from real matches (e.g., 2023–24 and 2024–25 seasons).
+
+1. Each match provides two observations (home team and away team goals).
+2. Team identities are encoded as dummy variables or categorical indices.
+3. We solve for $\( \alpha_i \)$ and $\( \delta_j \)$ by maximizing the joint log-likelihood:
+
+ ```math
+ {L} = \sum_{m} \left[ y_m \log(\lambda_m) - \lambda_m - \log(y_m!) \right]
+ ```
+   where $\( y_m \)$ is the observed goal count for match $\( m \)$.
+
+### Normalization
+
+Because the model is overparameterized (you can add a constant to all \( \alpha \)'s and subtract from all \( \delta \)'s without changing predictions), we impose a constraint:
+
+```math
+\sum_i \alpha_i = 0
+\quad \text{or} \quad \sum_j \delta_j = 0
+```
+
+This makes the parameters interpretable relative to a league-average baseline:
+- Positive $\( \alpha_i \):$ team scores **more than average**
+- Negative $\( \delta_j \):$ team concedes **fewer than average**
+
+
+**Summary:**
+- **Alpha (α)** measures how much a team contributes to scoring goals.
+- **Delta (δ)** measures how much a team contributes to conceding goals.
+- Both are estimated from historical goal data using a log-linear Poisson model and maximum likelihood.
+
 This method captures latent team quality and relative performance based on actual matches. Using two full seasons improves estimation stability and reduces noise from short-term anomalies.
 
 ## Revenue Mapping by League Position
@@ -62,16 +107,16 @@ We simulate each EPL season using **Monte Carlo methods**, where match outcomes 
 For each match between Team A and Team B:
 - Simulate goals scored by Team A:
   ```math
-  \text{Goals}_A \sim \text{Poisson}(\lambda_A), \quad \lambda_A = \exp(\alpha_A - \beta_B)
+  \text{Goals}_A \sim \text{Poisson}(\lambda_A), \quad \lambda_A = \exp(\alpha_A - \delta_B)
   ```
 - Simulate goals scored by Team B:
   ```math
-  \text{Goals}_B \sim \text{Poisson}(\lambda_B), \quad \lambda_B = \exp(\alpha_B - \beta_A)
+  \text{Goals}_B \sim \text{Poisson}(\lambda_B), \quad \lambda_B = \exp(\alpha_B - \delta_A)
   ```
 
 Where:
 - $\( \alpha_i \):$ attack strength of team $\( i \)$
-- $\( \beta_i \):$ defense strength of team $\( i \)$
+- $\( \delta_i \):$ defense strength of team $\( i \)$
 - $\( \lambda \):$ expected goals for each side, always positive due to exponential transformation
 
 We simulate all **380 matches** of the season using this method for 1000 seasons.
@@ -201,12 +246,12 @@ These changes are implemented by **solving for parameter shifts** in the log-sca
 Given the scoring model:
 
 ```math
-\lambda = \exp(\alpha - \beta)
+\lambda = \exp(\alpha - \delta)
 ```
 
 We solve for:
 - $\( \Delta \alpha = \log(1.10) \)$ to increase goals scored by 10%
-- $\( \Delta \beta = \log(1.10) \)$ to decrease goals conceded by 10%
+- $\( \Delta \delta = \log(1.10) \)$ to decrease goals conceded by 10%
 
 These shifts are applied **per team** using a **custom root-solving function**.
 
@@ -236,9 +281,9 @@ alphaShift <- function(team) {
 
 For each team, we run three simulation sets:
 
-1. **Baseline:** simulate a thousand of seasons with original $\( \alpha \)$, $\( \beta \)$ (already done)
+1. **Baseline:** simulate a thousand of seasons with original $\( \alpha \)$, $\( \delta \)$ (already done)
 2. **Attack Boost:** apply $\( \Delta \alpha = \log(1.10) \)$, re-simulate
-3. **Defense Boost:** apply $\( \Delta \beta = \log(1.10) \)$, re-simulate
+3. **Defense Boost:** apply $\( \Delta \delta = \log(1.10) \)$, re-simulate
 
 For each intervention, we compute the **change in expected revenue** relative to the baseline:
 
@@ -251,7 +296,7 @@ For each intervention, we compute the **change in expected revenue** relative to
 
 Where $\( R \)$ represents simulated total revenue over a season.
 
-+ 1,000 baseline simulations and 500 simulations for each of 20 teams with the alpha boost, a Total of 21000 simulated full seasons (attack and defense)
++ 1,000 baseline simulations and 500 simulations for each of 20 teams with the alpha boost, a total of 21000 simulated full seasons (attack and defense)
 
 ### Output:
 
