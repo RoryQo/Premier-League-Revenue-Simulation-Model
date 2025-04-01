@@ -155,7 +155,7 @@ draw.score <- function(team1, team2) {
 3. **Assign points** based on outcomes (3 for win, 1 for draw, 0 for loss)
 4. **Construct the league table** using total points, goal difference, and goals scored
 5. **Map final ranks to revenue** using the revenue table
-6. **Repeat for a thousand of seasons** to build full distributions for each team
+6. **Repeat for a thousand seasons** to build full distributions for each team
 
 ```r
 # Simulate 1000 seasons
