@@ -262,8 +262,8 @@ Given the scoring model:
 ```
 
 We solve for:
-- $\( \Delta \alpha = \log(1.10) \)$ to increase goals scored by 10%
-- $\( \Delta \delta = \log(1.10) \)$ to decrease goals conceded by 10%
+- $\( \Delta \alpha = \alpha + \log(.10) \)$ to increase goals scored by 10%
+- $\( \Delta \delta = \delta + \log(.10) \)$ to decrease goals conceded by 10%
 
 These shifts are applied **per team** using a **custom root-solving function**.
 
@@ -294,8 +294,8 @@ alphaShift <- function(team) {
 For each team, we run three simulation sets:
 
 1. **Baseline:** simulate a thousand of seasons with original $\( \alpha \)$, $\( \delta \)$ (already done)
-2. **Attack Boost:** apply $\( \Delta \alpha = \log(1.10) \)$, re-simulate
-3. **Defense Boost:** apply $\( \Delta \delta = \log(1.10) \)$, re-simulate
+2. **Attack Boost:** apply $\( \Delta \alpha = \alpha + \log(.10) \)$, re-simulate
+3. **Defense Boost:** apply $\( \Delta \delta = \delts + \log(.10) \)$, re-simulate
 
 For each intervention, we compute the **change in expected revenue** relative to the baseline:
 
