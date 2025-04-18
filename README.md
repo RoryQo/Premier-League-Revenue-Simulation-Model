@@ -251,19 +251,30 @@ We simulate two hypothetical improvements for each team:
 1. A **10% increase in expected goals scored**
 2. A **10% reduction in expected goals conceded**
 
-These changes are implemented by **solving for parameter shifts** in the log-scale of the Poisson model.
+To simulate marginal improvements in team performance, we implement a function that computes the required increase in a team’s attack strength parameter, `αᵢ`, to produce a **10% increase in average expected goals** across opponents.
+
 
 ### Method: Root-Solving for Shifted Parameters
 
-Given the scoring model:
+Under a Poisson goals model, the expected number of goals scored by team $i$ against opponent $j$ is modeled as:
 
-```math
-\lambda = \exp(\alpha - \delta)
-```
+$$
+\mathbb{E}[Y_{ij}] = \exp(\alpha_i - \delta_j)
+$$
 
-We solve for:
-- $\( \Delta \alpha = \alpha + \log(.10) \)$ to increase goals scored by 10%
-- $\( \Delta \delta = \delta + \log(.10) \)$ to decrease goals conceded by 10%
+We solve for a shifted value $\alpha_i^*$ such that the average expected goals increases by 10%. Formally, this requires solving:
+
+$$
+\frac{1}{N} \sum_{j \ne i} \exp(\alpha_i^* - \delta_j) = 1.1 \times \left( \frac{1}{N} \sum_{j \ne i} \exp(\alpha_i - \delta_j) \right)
+$$
+
+This is implemented as a nonlinear root-finding problem in $\alpha_i^*$, keeping the opponent defense parameters $\delta_j$ fixed.
+
+
+
+This required shift is **team-specific**. The magnitude of $\alpha_i^* - \alpha_i$ depends on the distribution of opponent defensive strengths $\delta_j$ faced by team $i$. Because expected goals are computed via a nonlinear exponential transformation, the same 10% increase in mean goals requires a different adjustment to $\alpha_i$ for each team.
+
+This transformation enables fair and interpretable simulations of performance gains, aligning latent skill improvements to a consistent increase in expected output while accounting for the surrounding competitive environment.
 
 These shifts are applied **per team** using a **custom root-solving function**.
 
@@ -294,8 +305,8 @@ alphaShift <- function(team) {
 For each team, we run three simulation sets:
 
 1. **Baseline:** simulate a thousand of seasons with original $\( \alpha \)$, $\( \delta \)$ (already done)
-2. **Attack Boost:** apply $\( \Delta \alpha = \alpha + \log(.10) \)$, re-simulate
-3. **Defense Boost:** apply $\( \Delta \delta = \delts + \log(.10) \)$, re-simulate
+2. **Attack Boost:** apply $\( \Delta \alpha_i  \)$, re-simulate
+3. **Defense Boost:** apply $\( \Delta \delta_i \)$, re-simulate
 
 For each intervention, we compute the **change in expected revenue** relative to the baseline:
 
