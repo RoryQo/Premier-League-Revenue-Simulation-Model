@@ -1,4 +1,4 @@
-# Premier League Season Simulator
+# Premier League Season Simulator 
 
 This project simulates full English Premier League (EPL) seasons using a **Poisson-based hierarchical goal model**. It applies **Monte Carlo methods** to evaluate how team strength, random variation, and marginal changes in strategy translate into league outcomes and economic value. The simulation framework estimates **expected values**, **variances**, and **counterfactual impacts** under different assumptions of performance and fortune.
 
